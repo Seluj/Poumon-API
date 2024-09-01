@@ -7,8 +7,7 @@
 #include <WiFiManager.h>
 #include <pins_arduino.h>
 
-// Replace with your network credentials
-const char *ssid = "ESP32-Access-Point";
+const char *ssid = "Lung-Network";
 const char *password = "123456789";
 
 // Set web server port number to 80
@@ -17,43 +16,23 @@ WebServer server(80);
 StaticJsonDocument<1024> jsonDocument;
 char buffer[1024];
 
-// Variable to store the HTTP request
-String header;
+const byte nbInput = 1;
 
-bool ledStatus;
+byte outputPin[nbInput] = {2};
+bool ledStatus[nbInput] = {false};
 
-// Auxiliar variables to store the current output state
-String output26State = "off";
-String output27State = "off";
-
-// Assign output variables to GPIO pins
-const int output = 2;
-
-int getPinMode(int p)
+int getIndex(byte tab[], byte size, byte byteToFind)
 {
-
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-  const int MAX_DIGITAL_PIN_NUMBER = 69;
-#else
-  const int MAX_DIGITAL_PIN_NUMBER = 19;
-#endif
-
-  // Check valid pin number
-  if (p > MAX_DIGITAL_PIN_NUMBER)
+  byte wantedpos = -1;
+  for (byte i = 0; i < size; i++)
   {
-    return -1;
+    if (byteToFind = tab[i])
+    {
+      wantedpos = i;
+      break;
+    }
   }
-
-  // Convert designated Arduino pin to ATMega port and pin
-  uint8_t pbit = digitalPinToBitMask(p);
-  uint8_t pport = digitalPinToPort(p);
-
-  // Read the ATmega DDR for this port
-  volatile uint32_t *pmodereg = portModeRegister(pport);
-
-  // Test the value of the bit for this pin and return
-  // 0 if it is reset and 1 if it is set
-  return ((*pmodereg & pbit) != 0);
+  return wantedpos;
 }
 
 void getValue()
@@ -69,23 +48,14 @@ void getValue()
   server.send(200, "application/json", buffer);
 }
 
-void setValue()
-{
-  if (server.hasArg("plain") == false)
-  {
-    server.send(300, "text/plain", "You must specify a value Number" + server.args());
-  }
-
-  String body = server.arg("plain");
-  deserializeJson(jsonDocument, body);
-
-  // Get RGB components
-  ledStatus = jsonDocument["ledValue"];
-
-  // Respond to the client
-  server.send(200, "application/json", body);
-}
-
+/**
+ * API to changed the value of an output
+ * JSON send look like :
+ * {
+ *    ledIndex = 2,
+ *    ledValue = true/false,
+ * }
+ */
 void changeLedValue()
 {
   if (server.hasArg("plain") == false)
@@ -97,24 +67,14 @@ void changeLedValue()
   deserializeJson(jsonDocument, body);
 
   int led = jsonDocument["ledIndex"];
-  int mode = getPinMode(led);
-  ledStatus = jsonDocument["ledValue"];
-  if (mode < 0)
-  {
-    server.send(409, "text/plain", "Pin number is invalid : " + led);
+  byte index = getIndex(outputPin, nbInput, led);
+  if (index == -1) {
+    server.send(404, "text/plain", "Unknow output pin");
+    return;
   }
-  else
-  {
-    if (mode == INPUT)
-    {
-      server.send(410, "text/plain", "Pin led is not in output : " + led);
-    }
-    else
-    {
-      digitalWrite(led, ledStatus);
-      server.send(200);
-    }
-  }
+  ledStatus[index] = jsonDocument["ledValue"];
+
+  server.send(200);
 }
 
 void testConnection()
@@ -125,10 +85,12 @@ void testConnection()
 void setup()
 {
   Serial.begin(115200);
-  // Initialize the output variables as outputs
-  pinMode(output, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output, LOW);
+
+  for (int i = 0; i < nbInput; i++)
+  {
+    pinMode(outputPin[i], OUTPUT);
+    digitalWrite(outputPin[i], LOW);
+  }
 
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Setting AP (Access Point)…");
@@ -140,7 +102,6 @@ void setup()
   Serial.println(IP);
 
   server.on("/getValue", HTTP_GET, getValue);
-  server.on("/setValue", HTTP_POST, setValue);
   server.on("/changeLedValue", HTTP_POST, changeLedValue);
   server.on("/testConnection", HTTP_GET, testConnection);
   server.begin();
@@ -150,12 +111,15 @@ void loop()
 {
   server.handleClient(); // Listen for incoming clients
 
-  if (ledStatus)
+  for (int i = 0; i < nbInput; i++)
   {
-    digitalWrite(output, HIGH);
-  }
-  else
-  {
-    digitalWrite(output, LOW);
+    if (ledStatus[i])
+    {
+      digitalWrite(outputPin[i], HIGH);
+    }
+    else
+    {
+      digitalWrite(outputPin[i], LOW);
+    }
   }
 }
