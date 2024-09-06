@@ -68,11 +68,36 @@ void changeLedValue()
 
   int led = jsonDocument["ledIndex"];
   byte index = getIndex(outputPin, nbInput, led);
-  if (index == -1) {
+  if (index == -1)
+  {
     server.send(404, "text/plain", "Unknow output pin");
     return;
   }
   ledStatus[index] = jsonDocument["ledValue"];
+
+  server.send(200);
+}
+
+/**
+ * API to change the state of a motor
+ * JSON send look like :
+ * {
+ *    motorIndex = 2,
+ *    motorPosition = 112,
+ *    motorSpeed = [0...1]
+ * }
+ */
+void changeMotorPosition() {
+  if (server.hasArg("plain") == false) {
+    server.send(400, "text/plain", "You must specify a value Number" + server.args());
+  }
+
+  String body = server.arg("plain");
+  deserializeJson(jsonDocument, body);
+
+  int motor = jsonDocument["motorIndex"];
+  int position = jsonDocument["motorPosition"];
+  int speed = jsonDocument["motorSpeed"];
 
   server.send(200);
 }
@@ -104,6 +129,7 @@ void setup()
   server.on("/getValue", HTTP_GET, getValue);
   server.on("/changeLedValue", HTTP_POST, changeLedValue);
   server.on("/testConnection", HTTP_GET, testConnection);
+  server.on("/changeMotorPosition", HTTP_POST, changeMotorPosition);
   server.begin();
 }
 
