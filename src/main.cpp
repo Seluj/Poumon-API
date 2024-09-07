@@ -48,6 +48,32 @@ void getValue()
   server.send(200, "application/json", buffer);
 }
 
+void getNumberOfMotorWithId()
+{
+  jsonDocument.clear();
+  JsonObject newObject = jsonDocument.createNestedObject();
+  int motor = 5;
+  newObject["motorNumber"] = motor;
+  randomSeed(analogRead(0));
+  for (size_t i = 0; i < motor; i++)
+  {
+    newObject[String(i)] = random(10000, 99999);
+  }
+
+  serializeJson(jsonDocument, buffer);
+  server.send(200, "application/json", buffer);
+}
+
+void getNumberOfMotor()
+{
+  jsonDocument.clear();
+  JsonObject newObject = jsonDocument.createNestedObject();
+  newObject["motorNumber"] = 4;
+
+  serializeJson(jsonDocument, buffer);
+  server.send(200, "application/json", buffer);
+}
+
 /**
  * API to changed the value of an output
  * JSON send look like :
@@ -74,6 +100,16 @@ void changeLedValue()
     return;
   }
   ledStatus[index] = jsonDocument["ledValue"];
+  String sender = jsonDocument["sender"];
+
+  // print the value to the serial port
+  Serial.print("[");
+  Serial.print(sender);
+  Serial.print("] ");
+  Serial.print("Led ");
+  Serial.print(led);
+  Serial.print(" set to ");
+  Serial.println(ledStatus[index]);
 
   server.send(200);
 }
@@ -87,8 +123,10 @@ void changeLedValue()
  *    motorSpeed = [0...1]
  * }
  */
-void changeMotorPosition() {
-  if (server.hasArg("plain") == false) {
+void changeMotorPosition()
+{
+  if (server.hasArg("plain") == false)
+  {
     server.send(400, "text/plain", "You must specify a value Number" + server.args());
   }
 
@@ -98,6 +136,18 @@ void changeMotorPosition() {
   int motor = jsonDocument["motorIndex"];
   int position = jsonDocument["motorPosition"];
   int speed = jsonDocument["motorSpeed"];
+  String sender = jsonDocument["sender"];
+
+  // print the value to the serial port
+  Serial.print("[");
+  Serial.print(sender);
+  Serial.print("] ");
+  Serial.print("Motor ");
+  Serial.print(motor);
+  Serial.print(" set to ");
+  Serial.print(position);
+  Serial.print(" with speed ");
+  Serial.println(speed);
 
   server.send(200);
 }
@@ -130,6 +180,8 @@ void setup()
   server.on("/changeLedValue", HTTP_POST, changeLedValue);
   server.on("/testConnection", HTTP_GET, testConnection);
   server.on("/changeMotorPosition", HTTP_POST, changeMotorPosition);
+  server.on("/getNumberOfMotorWithId", HTTP_GET, getNumberOfMotorWithId);
+  server.on("/getNumberOfMotor", HTTP_GET, getNumberOfMotor);
   server.begin();
 }
 
